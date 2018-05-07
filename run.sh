@@ -16,6 +16,8 @@ echo "-------------------------------------------------"
 echo "              RESULTS:"
 echo "-------------------------------------------------"
 
-valgrind -v --leak-check=full --log-file=memraw.log ./MAIN
+cat out.txt
+
+#valgrind -v --leak-check=full --log-file=memraw.log ./MAIN
 
 echo "-------------------------------------------------\n"

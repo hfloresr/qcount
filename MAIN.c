@@ -5,9 +5,9 @@
 
 main(){
 	/*int N[] = {20,200,2000,17,18,19,0}; */
-    int N[] = {200, 0};
+        int N[] = {20, 200, 2000, 0};
 	int n,ct,loop,round,answer,total,biggest,errflag;
-#define NLOOP 10
+#define NLOOP 10000
 
 	for (round = 0; N[round]>10; round++) {
 		n = N[round];

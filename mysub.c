@@ -230,6 +230,7 @@ int mysub(int n)
     /* indices of marbles */
     int indices[n];
     init_indices(indices, n);
+    int qcnt2 = 0;
 
     int query[QSIZE];           /* store current query */
 
@@ -242,6 +243,7 @@ int mysub(int n)
     for (i = 0; i < n; i+=4) {
         new_query(query, indices, i);
         qresult = QCOUNT(1, query);
+
         qbin = map_qcount(qresult);
         /* printf("qresult = %d\n", qresult); */
         if (qbin >= 0)
@@ -253,10 +255,11 @@ int mysub(int n)
         }
     }
 
-    Set black, white, even;
+    printf("B[2].size: %d\n", B[2].size);
+
+    Set black, white;
     init_set(&black);
     init_set(&white);
-    init_set(&even);
 
     /* Seperate sets into black & white marbles */
     if (B[2].size >= 1) {
@@ -266,42 +269,121 @@ int mysub(int n)
 
     /* flatten set of indices to two different sets (black and white) */
     while ((i = B[2].size-1) >= 0) {
-        query_set(query, &black);
-        query[3] = get_index_at(&B[2], i, 0);
+      query_set(query, &black);
+      query[3] = get_index_at(&B[2], i, 0);
+
+      qresult = QCOUNT(1, query);
+      if (qresult == 4) {
+          join_sets(&black, &B[2].list[i]);
+          remove_from_bucket(&B[2], i);
+      } else if (qresult == 2) {
+          join_sets(&white, &B[2].list[i]);
+          remove_from_bucket(&B[2], i);
+      }
+    }
+
+
+
+    int tmp;
+    int k;
+    int indices2[100];
+    int z = 0;
+    if (black.size <= 0 && white.size <= 0) {
+        query_set(query, &B[1].list[0]);
+        tmp = query[3];
+        query[3] = get_index_at(&B[1], 1, 0);
 
         qresult = QCOUNT(1, query);
         if (qresult == 4) {
-            join_sets(&black, &B[2].list[i]);
-            remove_from_bucket(&B[2], i);
-        } else if (qresult == 2) {
-            join_sets(&white, &B[2].list[i]);
-            remove_from_bucket(&B[2], i);
+            /*array_to_set(&black, query, QSIZE);*/
+            /*add_data(&white, tmp);*/
+
+            add_data(&black, query[3]);
+
+            query[0] = get_index_at(&B[1], 1, 1);
+            query[1] = get_index_at(&B[1], 1, 2);
+            query[2] = get_index_at(&B[1], 1, 3);
+            query[3] = get_data(&white, 0);
+
+            qresult = QCOUNT(1, query);
+            if (qresult == 4) {
+                add_data(&white, query[0]);
+                indices2[z++] = query[1];
+                indices2[z++] = query[2];
+            } else {
+                add_array_to_bucket(&B[0], query, QSIZE);
+            }
+        } else {
+            k = 1;
+            tmp = qresult;
+            query[3] = get_index_at(&B[1], 1, k);
+            while ((qresult = QCOUNT(1, query)) == tmp) {
+                z++;
+                k++;
+                query[3] = get_index_at(&B[1], 1, k);
+            }
+            add_data(&black, get_index_at(&B[1],1,0));
+            add_data(&white, query[3]);
         }
+    } else if( black.size <= 0) {
+        k = 0;
+        query_set(query, &white);
+        query[3] = get_data(&B[1].list[0], k++);
+        while ((qresult = QCOUNT(1, query)) == 4 ) {
+            z++;
+            query[3] = get_data(&B[1].list[0], k++);
+        }
+        add_data(&black, query[3]);
+    } else if (white.size <= 0) {
+        k = 0;
+        query_set(query, &black);
+        query[3] = get_data(&B[1].list[0], k++);
+        while ((qresult = QCOUNT(1, query)) == 4) {
+            z++;
+            query[3] = get_data(&B[1].list[0], k++);
+        }
+        add_data(&white, query[3]);
     }
 
     /* trim set of indices that resulted in a 2 from QCOUNT */
+    int bcnt =0, wcnt=0;
+    int qcnter = 0;
+    int delta_w, delta_b, threshold;
     int b1_sz = B[1].size;
-    for (i = 1; i < b1_sz; i+=2) {
-        query_set(query, &B[1].list[i-1]);
-        query[3] = get_index_at(&B[1], i, 0);
+    threshold = (n - B[0].size) / 2;
+    for (i = 0; i < b1_sz; ++i) {
+        query_set(query, &B[1].list[i]);
+        query[3] = get_data(&black, 0);
+
+        delta_b = (black.size + bcnt);
+        delta_w = (white.size + wcnt);
+
+        if (delta_b >= threshold || delta_w >= threshold)
+            break;
 
         qresult = QCOUNT(1, query);
-        printf("qresult: %d\n", qresult);
+        qcnter++;
         if (qresult == 4) {
-            query[3] = get_data(&black, 0);
-            qresult = QCOUNT(1, query);
-
-            query[3] = get_index_at(&B[1], i, 0);
-            if (qresult == 4)
-                array_to_set(&black, query, QSIZE);
-            else 
-                array_to_set(&white, query, QSIZE);
+            bcnt += 3;
+            wcnt += 1;
         } else if (qresult == 0) {
-            array_to_set(&even, query, QSIZE);
+            wcnt += 3;
+            bcnt += 1;
         } else {
-            break;
+            query[3] = get_data(&white, 0);
+            qresult = QCOUNT(1, query);
+            qcnter++;
+
+            if (qresult == 4) {
+                wcnt += 3;
+                bcnt += 1;
+            } else {
+                bcnt += 3;
+                wcnt += 1;
+            }
         }
     }
+
 
     printf("Size B[0,1,2] :  (%d, %d, %d)\n", B[0].size, B[1].size, B[2].size);
 
@@ -311,202 +393,22 @@ int mysub(int n)
     printf("(white set): size: %d\tvalues: ", white.size);
     print_set(&white);
 
-    printf("(even set): size: %d\tvalues: ", even.size);
-    print_set(&even);
+    printf("(bcnt, wcnt, qcnter, qcnt2, z) : (%d, %d, %d, %d)\n", bcnt, wcnt, qcnter, qcnt2, z);
 
-
-
-
-
-
-
-    /*
-    srand(time(0));
-
-    int bsz, wsz, esz;
-    Set blo[256], wlo[256], elo[256];
-    for (i = 0; i < 256; ++i) {
-        init_set(&blo[i]);
-        init_set(&wlo[i]);
-        init_set(&elo[i]);
-    }
-    bsz = wsz = esz = 0;
-
-    printf("Initial B[1] size: %d\n", B[1].size);
-
-    int tmp[3];
-    int k;
-    while ((i = B[1].size-1) > 1) {
-        query_set(query, &black);
-
-        r1 = rand() % B[1].size;
-        r2 = rand() % QSIZE;
-        query[2] = get_index_at(&B[1], r1, r2);
-
-        while((r3 = rand() % (B[1].size - 1)) == r1)
-            ;
-        r4 = rand() % QSIZE;
-        query[3] = get_index_at(&B[1], r3, r4);
-
-        qresult = QCOUNT(1, query);
-        if (qresult == 4) {
-            add_data(&black, query[2]);
-            add_data(&black, query[3]);
-
-            k = 0;
-            for (j = 0; j < 4; ++j) {
-                if (j != r2) {
-                    tmp[k++] = get_index_at(&B[1], r1, j);
-                }
-            }
-            array_to_set(&blo[bsz++], tmp, 3);
-
-            k = 0;
-            for (j = 0; j < 4; ++j) {
-                if (j != r4) {
-                    tmp[k++] = get_index_at(&B[1], r3, j);
-                }
-            }
-            array_to_set(&blo[bsz++], tmp, 3);
-
-        } else if (qresult == 2) {
-            add_data(&even_pairs, query[2]);
-            add_data(&even_pairs, query[3]);
-
-            k = 0;
-            for (j = 0; j < 4; ++j) {
-                if (j != r2) {
-                    tmp[k++] = get_index_at(&B[1], r1, j);
-                }
-            }
-            array_to_set(&elo[esz++], tmp, 3);
-
-            k = 0;
-            for (j = 0; j < 4; ++j) {
-                if (j != r4) {
-                    tmp[k++] = get_index_at(&B[1], r3, j);
-                }
-            }
-            array_to_set(&elo[esz++], tmp, 3);
-        } else if (qresult == 0) {
-            add_data(&white, query[2]);
-            add_data(&white, query[3]);
-
-            k = 0;
-            for (j = 0; j < 4; ++j) {
-                if (j != r2) {
-                    tmp[k++] = get_index_at(&B[1], r1, j);
-                }
-            }
-            array_to_set(&wlo[wsz++], tmp, 3);
-
-            k = 0;
-            for (j = 0; j < 4; ++j) {
-                if (j != r4) {
-                    tmp[k++] = get_index_at(&B[1], r3, j);
-                }
-            }
-            array_to_set(&wlo[wsz++], tmp, 3);
-        } else {
-            printf("i = %d\t", i);
-            print_query(query);
-            break;
-        }
-        remove_from_bucket(&B[1], r1);
-        remove_from_bucket(&B[1], r3);
-    }
-
-    int bcnt=0, wcnt = 0;
-
-
-    printf("wsz, bsz, esz: (%d, %d, %d)\n", wsz, bsz, esz);
-    int qres3;
-
-    for (i = 0; i < esz; ++i) {
-        for (j = 0; j < 3; ++j) {
-            query[j] = get_data(&elo[i], j);
-        }
-
-        query[3] = get_data(&black, 0);
-        qresult = QCOUNT(1, query);
-
-        if (qresult == 4) {
-            bcnt += 3;
-        } else {
-            query[3] = get_data(&white, 0);
-            qresult = QCOUNT(1, query);
-            if (qresult == 4)
-                wcnt += 3;
-        }
-
-        if (qresult == 0) {
-            bcnt += 2;
-            wcnt += 1;
-        } else if (qresult == 2) {
-            wcnt += 2;
-            bcnt += 1;
-        }
-    }
-
-
-    for (i = 1; i < bsz; i+=2) {
-        for (j = 0; j < 3; ++j) {
-            query[j] = get_data(&blo[i-1], j);
-        }
-        query[3] = get_data(&blo[i], 0);
-        
-        qresult = QCOUNT(1, query);
-        if (qresult == 2) {
-            query[3] = get_data(&white, 0);
-            qresult = QCOUNT(1, query);
-            if (qresult == 4) {
-                wcnt += 4;
-                bcnt += 2;
-            }
-            else {
-                bcnt += 4;
-                wcnt += 2;
-            }
-
-        } else if (qresult == 0) {
-            query[3] = get_data(&blo[i], 1);
-            qresult = QCOUNT(1, query);
-            if (qresult == 0) {
-                wcnt += 4;
-                bcnt += 2;
-            } else if (qresult == 2) {
-                bcnt += 4;
-                wcnt += 2;
-            }
-        } else if (qresult == 4) {
-            for (j = 0; j < 3; ++j)
-                query[j] = get_data(&blo[i], j);
-            query[3] = get_data(&white, 0);
-            qresult = QCOUNT(1, query);
-            if (qresult == 4) {
-                wcnt += 6;
-            } else {
-                wcnt += 4;
-                bcnt += 2;
-            }
-        }
-    }
-    */
 
     int res;
 
-    if (white.size > black.size)
-        res = get_data(&white, 4);
-    else if (black.size > white.size)
-        res = get_data(&black, 4);
-    else
+    if (white.size+wcnt > black.size+bcnt)
+        res = get_data(&white, 0);
+    else if (black.size+bcnt > white.size+wcnt)
+        res = get_data(&black, 0);
+    else if (black.size+bcnt == white.size+wcnt)
         res = 0;
 
     /* clean up memory allocs */
     for (i = n_buckets-1; i >= 0 ; --i)
         free_bucket(&B[i]);
 
-    free_set(&even);
     free_set(&white);
     free_set(&black);
 
